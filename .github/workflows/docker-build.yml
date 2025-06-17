@@ -33,19 +33,39 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Get Upstream Version
+        id: upstream_version
+        run: |
+          UPSTREAM_OWNER="spliit-app" # Replace with the actual upstream owner (e.g., 'kubernetes')
+          UPSTREAM_REPO="spliit" # Replace with the actual upstream repository name (e.g., 'kubectl')
+
+          # Fetch the latest release from the upstream repository
+          LATEST_RELEASE_JSON=$(curl -s -H "Authorization: token ${{ secrets.UPSTREAM_GITHUB_TOKEN }}" \
+                                     "https://api.github.com/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}/releases/latest")
+
+          # Extract the tag_name (e.g., "v1.2.3" or "1.2.3")
+          UPSTREAM_FULL_TAG=$(echo "$LATEST_RELEASE_JSON" | jq -r '.tag_name // empty')
+
+          if [ -z "$UPSTREAM_FULL_TAG" ]; then
+            echo "No releases found on upstream or tag_name is empty. Skipping full version tag."
+            echo "UPSTREAM_FULL_VERSION_TAG=" >> $GITHUB_OUTPUT # Set an empty output
+          else
+            echo "Detected Upstream Full Version Tag: $UPSTREAM_FULL_TAG"
+            echo "UPSTREAM_FULL_VERSION_TAG=$UPSTREAM_FULL_TAG" >> $GITHUB_OUTPUT
+          fi
+
       - name: Docker meta
-        # Generate Docker tags and labels
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/jasonlaguidice/spliit
+          images: ghcr.io/${{ github.repository }}
           tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,format=long
+            # Always include the 'latest' tag when on the default branch
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }} 
+
+            # Conditionally include the upstream full version tag
+            # Only if the tag was successfully retrieved and we are on the default branch
+            type=raw,value=${{ steps.upstream_version.outputs.UPSTREAM_FULL_VERSION_TAG }},enable=${{ steps.upstream_version.outputs.UPSTREAM_FULL_VERSION_TAG != '' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
