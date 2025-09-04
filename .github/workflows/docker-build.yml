@@ -7,6 +7,9 @@ on:
     paths:
       - 'Dockerfile'
       - 'src/**'
+  repository_dispatch:
+    types:
+      - upstream_sync
   workflow_dispatch:
 
 jobs:
