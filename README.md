@@ -50,7 +50,7 @@ You can easily add missing translations to the project or even add a new languag
 Here is the current state of translation:
 
 <a href="https://hosted.weblate.org/engage/spliit/">
-  <img src="https://hosted.weblate.org/widget/spliit/spliit/horizontal-auto.svg" alt="Translation status" />
+<img src="https://hosted.weblate.org/widget/spliit/spliit/multi-auto.svg" alt="Translation status" />
 </a>
 
 ## Run locally
@@ -67,6 +67,13 @@ Here is the current state of translation:
 2. Copy the file `container.env.example` as `container.env`
 3. Run `npm run start-container` to start the postgres and the spliit2 containers
 4. You can access the app by browsing to http://localhost:3000
+
+## Health check
+
+The application has a health check endpoint that can be used to check if the application is running and if the database is accessible.
+
+- `GET /api/health/readiness` or `GET /api/health` - Check if the application is ready to serve requests, including database connectivity.
+- `GET /api/health/liveness` - Check if the application is running, but not necessarily ready to serve requests.
 
 ## Opt-in features
 
