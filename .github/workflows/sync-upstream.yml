@@ -5,6 +5,9 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   sync_with_upstream:
     runs-on: ubuntu-latest
@@ -12,7 +15,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Fetch all history for all branches and tags
+          token: ${{ secrets.WORKFLOW_TOKEN }}
           fetch-depth: 0
 
       - name: Configure Git
@@ -26,20 +29,25 @@ jobs:
           git fetch upstream
 
       - name: Merge upstream changes
+        id: merge
         run: |
-          git merge upstream/main --allow-unrelated-histories
+          if git diff --quiet HEAD upstream/main; then
+            echo "No changes to merge from upstream."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Merging upstream changes."
+            git merge upstream/main --allow-unrelated-histories
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Push changes to fork
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: main
-          force: true
+        if: steps.merge.outputs.changed == 'true'
+        run: git push origin main
 
       - name: Check for relevant changes
         id: check_changes
+        if: steps.merge.outputs.changed == 'true'
         run: |
-          # Check if any files in src/ or Dockerfile changed
           if git diff --name-only HEAD~1 HEAD | grep -E '^(src/|Dockerfile)'; then
             echo "relevant_changes=true" >> $GITHUB_OUTPUT
           else
@@ -50,7 +58,8 @@ jobs:
         if: steps.check_changes.outputs.relevant_changes == 'true'
         run: |
           curl -X POST \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Authorization: token ${{ secrets.WORKFLOW_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/dispatches \
             -d '{"event_type":"upstream_sync","client_payload":{"ref":"${{ github.ref }}"}}'
+
